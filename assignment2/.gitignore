@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+outputs/qwen25_05b_lora/checkpoint-*/
+outputs/qwen25_05b_lora_before_retrain/
+outputs/qwen25_05b_lora_checkpoint60_backup/
+outputs/*_before_retrain/
+outputs/*_backup/
+train_log.txt

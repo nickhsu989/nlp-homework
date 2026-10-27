@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>健康諮詢小幫手</title>
+</head>
+<body>
+<h1>健康諮詢小幫手</h1>
+<label><input type="checkbox" id="retrieve" checked> 進行檢索</label>
+<div id="chat"></div>
+<input id="q" type="text" style="width:60%">
+<button onclick="send()">送出</button>
+<button onclick="summarize()">整理重點</button>
+<button onclick="resetChat()">清除對話</button>
+<script>
+async function send(){
+  const q=document.getElementById('q').value;
+  const retrieve=document.getElementById('retrieve').checked;
+  const res=await fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q,retrieve})});
+  const d=await res.json();
+  const chat=document.getElementById('chat');
+  chat.innerHTML += '<p><b>你：</b>'+q+'</p><p><b>助手：</b>'+d.answer.replace(/\n/g,'<br>')+'</p>';
+  document.getElementById('q').value='';
+}
+async function summarize(){
+  const res=await fetch('/summarize',{method:'POST'});
+  const d=await res.json();
+  const chat=document.getElementById('chat');
+  chat.innerHTML += '<p><b>重點整理：</b>'+d.summary.replace(/\n/g,'<br>')+'</p>';
+}
+async function resetChat(){
+  await fetch('/reset',{method:'POST'});
+  document.getElementById('chat').innerHTML='';
+}
+</script>
+</body>
+</html>
