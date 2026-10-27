@@ -9,17 +9,20 @@ app = Flask(__name__)
 ENCODER = SentenceTransformer("BAAI/bge-m3")
 INDEX = faiss.read_index("vector.index")
 MODEL = "gemma3:4b"
+RETRIEVAL_K = 5
+MIN_SCORE = 0.55
 history = []
 
 
-def retrieve(query, k=3):
+def retrieve(query, k=RETRIEVAL_K, min_score=MIN_SCORE):
     emb = ENCODER.encode([query], normalize_embeddings=True)
     D, I = INDEX.search(emb, k)
-    ids = [int(x) for x in I[0] if x != -1]
     conn = sqlite3.connect("news.db")
     rows = []
-    for did in ids:
-        r = conn.execute("SELECT title, link, created_at, summary FROM news WHERE id=?", (did,)).fetchone()
+    for score, did in zip(D[0], I[0]):
+        if did == -1 or float(score) < min_score:
+            continue
+        r = conn.execute("SELECT title, link, created_at, summary FROM news WHERE id=?", (int(did),)).fetchone()
         if r:
             rows.append({"title": r[0], "link": r[1], "created_at": r[2], "summary": r[3]})
     conn.close()
@@ -59,7 +62,15 @@ def chat():
     use_retrieval = bool(data.get("retrieve", True))
     sources = retrieve(question) if use_retrieval else []
     context = "\n".join(f"- {s['title']}: {s['summary']}" for s in sources)
-    msgs = [{"role": "system", "content": "你是健康諮詢小幫手，以繁體中文回答。"}]
+    if use_retrieval and not sources:
+        return jsonify({
+            "answer": "目前檢索不到與問題足夠相關的新聞，請換個問法或補充關鍵字。",
+            "sources": [],
+        })
+    system_prompt = "你是健康諮詢小幫手，以繁體中文回答。"
+    if context:
+        system_prompt += "只根據提供的參考資料回答；若資料不足，請明確說明，不要自行推測。"
+    msgs = [{"role": "system", "content": system_prompt}]
     for h in history:
         msgs.append(h)
     user_content = question if not context else f"參考資料：\n{context}\n\n問題：{question}"
@@ -86,7 +97,8 @@ def summarize():
     )
     context = "\n".join(f"- {s['title']}: {s['summary']}" for s in sources)
     prompt = (
-        "請根據以下對話問題與參考資料，用繁體中文整理重點並回答：\n"
+        "請根據以下對話問題與參考資料，用繁體中文整理重點並回答。"
+        "只使用參考資料中的內容；若資料不足，請明確說明，不要自行推測。\n"
         f"問題：\n" + "\n".join(qs)
     )
     if context:
