@@ -1,0 +1,72 @@
+[
+    {
+        "name": "batch_01.json",
+        "size": 100390,
+        "sha256": "D94AE72CE1CBB48B409121F4584592BF686C9124281DB81802F028F8DEC26EB8"
+    },
+    {
+        "name": "batch_02.json",
+        "size": 31478,
+        "sha256": "81A8BFB2F4CA40B4DEE6F9C2C77FC4F5882FF22A8407BC6130A64C782214D539"
+    },
+    {
+        "name": "batch_03.json",
+        "size": 33576,
+        "sha256": "D4F369D1CA9039A799C191816FB7D37FFC6337A5ED9211986368C28A5F09DB9F"
+    },
+    {
+        "name": "batch_04.json",
+        "size": 5092,
+        "sha256": "A4D4BDF5BA5684595B52FDFA1EEE657534FE634251127999723344A26B91B3F2"
+    },
+    {
+        "name": "batch_05.json",
+        "size": 3667,
+        "sha256": "D89C5DC10A8300D0D5FAEB7EBE471A4EFE8BB10476272F302800CC4B5774A250"
+    },
+    {
+        "name": "batch_06.json",
+        "size": 28941,
+        "sha256": "71889BE7AC89EF3892058CBD4A947AD97822F9D219075E5EED51682F3B7FC352"
+    },
+    {
+        "name": "batch_07.json",
+        "size": 28312,
+        "sha256": "C1EAC2AD8F4BD7FD24690FD2C3E390CE589768DF877ECFF2D2D8B2B9BA16D7F7"
+    },
+    {
+        "name": "batch_08.json",
+        "size": 27700,
+        "sha256": "729176FE5F09A0432FCE98BEDDF4D91A1C051C4CD2A9E52196C81C19D8B383D1"
+    },
+    {
+        "name": "batch_09.json",
+        "size": 27361,
+        "sha256": "BBF63CD4071C4869DA251ED50B412A1A01CCCD7A1BFFB9C6B326116A9ACF7660"
+    },
+    {
+        "name": "batch_10.json",
+        "size": 27079,
+        "sha256": "ECC655ECCC711BC34270F6F5E13A1B04E0A91C53F6EE840536E5F605F22D7D07"
+    },
+    {
+        "name": "batch_11.json",
+        "size": 27349,
+        "sha256": "17ADBB3DAD877DBE6F8EE529B1F949DF3955B15807E2112036116E42B5FCD50A"
+    },
+    {
+        "name": "batch_12.json",
+        "size": 27070,
+        "sha256": "55AD3418F7E2613014E330D94908DF9F58F63DA5C913E478D1C37913B0064031"
+    },
+    {
+        "name": "batch_13.json",
+        "size": 26836,
+        "sha256": "8ADBF2068B8BEB41F537CC4EE131AA0F122A1666BA43A0B3F00CF9FE65DD7209"
+    },
+    {
+        "name": "batch_14.json",
+        "size": 26986,
+        "sha256": "4BA1A5736D4C0C67D34D586C1966DD655A8F41468D4EE5F5C1B059F3B094D63D"
+    }
+]

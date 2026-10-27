@@ -1,5 +1,5 @@
 """
-載入 train_qlora.py 儲存的最佳 LoRA adapter，進行「多輪互動式對話」。
+載入 train_qlora.py 儲存的最後 LoRA adapter，進行「多輪互動式對話」。
 
 這個程式和單輪測試版最大的差別是：
 
@@ -24,17 +24,17 @@
 
 例如：
 
-    使用者：我想點一杯冰拿鐵。
-    助理：好的，一杯大杯冰拿鐵。
-    使用者：幫我加一份濃縮。
-    助理：好的，已幫您加一份濃縮咖啡。
+    使用者：今天下大雨，我沒帶傘。
+    助理：那我陪你一起淋，反正我想跟你走同一條路。
+    使用者：這樣會感冒耶。
+    助理：那就抱緊一點，當你的專屬暖暖包。
 
-第二輪的「幫我加一份濃縮」本身沒有再次說「冰拿鐵」，
-但模型可以從前面的 conversation history 知道使用者正在修改上一杯飲料。
+第二輪的「這樣會感冒耶」本身沒有再次說「下雨」，
+但模型可以從前面的 conversation history 知道使用者正在延續同一個情境。
 
-如果要測試特定 checkpoint，也可以把 ADAPTER_DIR 改成：
+如果要測試特定 checkpoint（需先保留該 checkpoint），也可以把 ADAPTER_DIR 改成：
 
-    outputs/qwen25_05b_lora/checkpoint-200
+    outputs/qwen25_05b_lora/checkpoint-189
 
 注意：
 本專案的 QLoRA 使用的是 bitsandbytes NF4，而不是 TorchAO quantization。
@@ -114,15 +114,15 @@ from transformers import AutoTokenizer
 
 # LoRA adapter 的位置。
 #
-# train_qlora.py 正常訓練完成後，會把最佳模型存到：
+# train_qlora.py 正常訓練完成後，會把最後模型存到：
 #
 #     outputs/qwen25_05b_lora
 #
 # 如果想比較某個特定 checkpoint：
 #
-#     ADAPTER_DIR = "outputs/qwen25_05b_lora/checkpoint-200"
+#     ADAPTER_DIR = "outputs/qwen25_05b_lora/checkpoint-189"
 #
-# 在 Colab 訓練時，adapter 直接放在 outputs/ 底下；
+# 訓練時 adapter 直接放在 outputs/ 底下；
 # 在本機把下載的 adapter 解壓到 adapter/ 底下時，則是
 # adapter/outputs/qwen25_05b_lora。
 # 下面這段會自動挑選實際存在的那一個。
@@ -157,18 +157,21 @@ ADAPTER_DIR = resolve_adapter_dir()
 #
 # 這段內容會保留在每一輪 conversation context 中。
 SYSTEM_PROMPT = (
-    "你是一個情話高手，你會以親切、溫和的口吻來回答使用者的問題。"
+    "你是一個土味情話高手。\n"
+    "你會以親切、溫和、俏皮但不油膩的口吻跟使用者互動。\n"
+    "回答要自然、符合日常台灣/華語用法，避免過於露骨或不當內容。\n"
+    "每次回應都要符合「土味情話」的風格，善用反差、關心與小心機的表達方式。"
 )
 
 
 # 每次 assistant 最多可以新產生多少 tokens。
 #
-# 這裡的 256 是「新回答」的上限，
+# 這裡的 100 是「新回答」的上限，
 # 不包含前面 system / user / assistant 的歷史內容。
 #
-# 咖啡點餐通常回答很短，
-# 256 已經相當充足。
-MAX_NEW_TOKENS = 256
+# 訓練語料的 assistant 回覆很短，
+# 100 tokens 已經足夠，也能避免小模型長篇離題。
+MAX_NEW_TOKENS = 100
 
 
 # Sampling temperature。
@@ -179,13 +182,9 @@ MAX_NEW_TOKENS = 256
 # 越高：
 #     回答變化越多，但也可能更不穩定。
 #
-# 例如：
-#
-#     0.2 → 非常穩定
-#     0.7 → 自然且有一些變化
-#     1.0 → 隨機性更高
-#
-TEMPERATURE = 0.7
+# 本版本使用 greedy decoding，因此 temperature 不參與實際生成；
+# 保留 1.0 是為了避免 generate() 對未使用的 sampling 參數發出警告。
+TEMPERATURE = 1.0
 
 
 # Top-p sampling。
@@ -199,8 +198,8 @@ TEMPERATURE = 0.7
 #
 # 表示保留累積機率約 90% 的候選 token。
 #
-# 這通常會和 temperature 一起使用。
-TOP_P = 0.9
+# 本版本使用 greedy decoding，因此 top_p 不參與實際生成。
+TOP_P = 1.0
 
 
 # 是否啟用 sampling。
@@ -213,7 +212,7 @@ TOP_P = 0.9
 #     通常接近 greedy decoding，
 #     回答比較固定。
 #
-DO_SAMPLE = True
+DO_SAMPLE = False
 
 
 # 最多保留多少輪 user-assistant 對話。
@@ -223,7 +222,7 @@ DO_SAMPLE = True
 #     user
 #     assistant
 #
-# 如果設成 10，最多保留最近 10 輪。
+# 如果設成 4，最多保留最近 4 輪。
 #
 # 為什麼需要限制？
 #
@@ -233,9 +232,9 @@ DO_SAMPLE = True
 # - GPU 記憶體需求會增加
 # - 最後可能超過模型 context window
 #
-# 咖啡點餐通常不需要非常長的歷史，
-# 10 輪已經足夠。
-MAX_HISTORY_TURNS = 10
+# 訓練語料最多 4 輪對話，因此保留最近 4 輪即可，
+# 避免推論時出現訓練分布外的超長上下文。
+MAX_HISTORY_TURNS = 4
 
 
 # =============================================================================
@@ -265,7 +264,7 @@ def trim_history(messages):
 
     筆。
 
-    例如 MAX_HISTORY_TURNS = 10：
+    例如 MAX_HISTORY_TURNS = 4：
 
         10 個 user
         +
@@ -364,7 +363,7 @@ def generate_reply(model, tokenizer, messages):
     # -------------------------------------------------------------------------
 
     # AutoPeftModel 使用 device_map="auto" 後，
-    # 這個 0.5B 模型在單張 T4 上通常整個都會放到 cuda:0。
+    # 這個 0.5B 模型在單張 4 GB GPU 上通常整個都會放到 cuda:0。
     #
     # model.device 會告訴我們主要模型所在裝置。
     inputs = inputs.to(model.device)
@@ -398,29 +397,18 @@ def generate_reply(model, tokenizer, messages):
     # - 推論速度較好
     with torch.inference_mode():
 
-        output = model.generate(
-            **inputs,
+        generation_kwargs = {
+            "max_new_tokens": MAX_NEW_TOKENS,
+            "do_sample": DO_SAMPLE,
+            "pad_token_id": tokenizer.pad_token_id,
+            "eos_token_id": tokenizer.eos_token_id,
+        }
 
-            # 最多產生多少新 token。
-            max_new_tokens=MAX_NEW_TOKENS,
+        if DO_SAMPLE:
+            generation_kwargs["temperature"] = TEMPERATURE
+            generation_kwargs["top_p"] = TOP_P
 
-            # 是否使用 sampling。
-            do_sample=DO_SAMPLE,
-
-            # sampling temperature。
-            temperature=TEMPERATURE,
-
-            # nucleus sampling。
-            top_p=TOP_P,
-
-            # 如果 tokenizer 有 pad token，
-            # 明確告訴 generate() 使用哪一個。
-            pad_token_id=tokenizer.pad_token_id,
-
-            # EOS token：
-            # 模型產生這個 token 時可以停止 generation。
-            eos_token_id=tokenizer.eos_token_id,
-        )
+        output = model.generate(**inputs, **generation_kwargs)
 
     # -------------------------------------------------------------------------
     # Step 4：只取新生成的 assistant tokens
@@ -510,7 +498,7 @@ def main():
         # LoRA adapter 目錄。
         ADAPTER_DIR,
 
-        # Tesla T4 使用 FP16。
+        # 使用 FP16 載入模型。
         dtype=torch.float16,
 
         # 自動把模型放到可用 GPU。
@@ -521,6 +509,7 @@ def main():
     #
     # 關閉 dropout 等只有 training 才需要的行為。
     model.eval()
+    model.config.use_cache = True
 
 
     # -------------------------------------------------------------------------

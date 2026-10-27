@@ -1,0 +1,221 @@
+{
+  "source": {
+    "repository": "nickhsu989/nlp_hw",
+    "path": "assignment2/data/raw",
+    "batch_files": 14
+  },
+  "system_prompt": "你是一個土味情話高手。\n你會以親切、溫和、俏皮但不油膩的口吻跟使用者互動。\n回答要自然、符合日常台灣/華語用法，避免過於露骨或不當內容。\n每次回應都要符合「土味情話」的風格，善用反差、關心與小心機的表達方式。",
+  "seed": 42,
+  "raw_conversations": 403,
+  "raw_system_prompt_variants": 1,
+  "trimmed_trailing_user_turns": 25,
+  "dropped": {
+    "bopomofo_text": 1,
+    "less_than_2_user_turns": 1,
+    "meta_ai_reference": 2,
+    "unexpected_latin:can": 2,
+    "unexpected_latin:commercial": 1,
+    "unexpected_latin:eight": 1,
+    "unexpected_latin:lan": 1,
+    "unexpected_latin:minnesota": 1,
+    "unexpected_latin:ounc": 1,
+    "unexpected_latin:polyline": 1,
+    "unexpected_latin:talking": 1,
+    "unexpected_latin:which": 2
+  },
+  "drop_details": [
+    {
+      "file": "batch_01.json",
+      "index": 31,
+      "reason": "unexpected_latin:commercial"
+    },
+    {
+      "file": "batch_01.json",
+      "index": 64,
+      "reason": "unexpected_latin:can"
+    },
+    {
+      "file": "batch_01.json",
+      "index": 70,
+      "reason": "unexpected_latin:can"
+    },
+    {
+      "file": "batch_02.json",
+      "index": 11,
+      "reason": "bopomofo_text"
+    },
+    {
+      "file": "batch_03.json",
+      "index": 1,
+      "reason": "meta_ai_reference"
+    },
+    {
+      "file": "batch_03.json",
+      "index": 5,
+      "reason": "unexpected_latin:ounc"
+    },
+    {
+      "file": "batch_03.json",
+      "index": 7,
+      "reason": "unexpected_latin:lan"
+    },
+    {
+      "file": "batch_03.json",
+      "index": 8,
+      "reason": "unexpected_latin:minnesota"
+    },
+    {
+      "file": "batch_03.json",
+      "index": 12,
+      "reason": "unexpected_latin:talking"
+    },
+    {
+      "file": "batch_03.json",
+      "index": 22,
+      "reason": "unexpected_latin:which"
+    },
+    {
+      "file": "batch_03.json",
+      "index": 23,
+      "reason": "unexpected_latin:polyline"
+    },
+    {
+      "file": "batch_03.json",
+      "index": 25,
+      "reason": "unexpected_latin:which"
+    },
+    {
+      "file": "batch_03.json",
+      "index": 26,
+      "reason": "less_than_2_user_turns"
+    },
+    {
+      "file": "batch_05.json",
+      "index": 1,
+      "reason": "meta_ai_reference"
+    },
+    {
+      "file": "batch_06.json",
+      "index": 3,
+      "reason": "unexpected_latin:eight"
+    }
+  ],
+  "cleaned": {
+    "conversations": 388,
+    "messages": 2704,
+    "message_length_min": 5,
+    "message_length_max": 9,
+    "roles": {
+      "assistant": 1158,
+      "system": 388,
+      "user": 1158
+    },
+    "turn_distribution": {
+      "2": 21,
+      "3": 352,
+      "4": 15
+    },
+    "unique_user_texts": 1107,
+    "unique_assistant_texts": 1136
+  },
+  "heldout": {
+    "conversations": 15,
+    "messages": 107,
+    "message_length_min": 5,
+    "message_length_max": 9,
+    "roles": {
+      "assistant": 46,
+      "system": 15,
+      "user": 46
+    },
+    "turn_distribution": {
+      "2": 1,
+      "3": 12,
+      "4": 2
+    },
+    "unique_user_texts": 46,
+    "unique_assistant_texts": 46,
+    "file": "data/eval/heldout.jsonl"
+  },
+  "chat": {
+    "conversations": 373,
+    "messages": 2597,
+    "message_length_min": 5,
+    "message_length_max": 9,
+    "roles": {
+      "assistant": 1112,
+      "system": 373,
+      "user": 1112
+    },
+    "turn_distribution": {
+      "2": 20,
+      "3": 340,
+      "4": 13
+    },
+    "unique_user_texts": 1065,
+    "unique_assistant_texts": 1094,
+    "file": "data/chat.jsonl"
+  },
+  "heldout_sources": [
+    {
+      "file": "batch_01.json",
+      "index": 59
+    },
+    {
+      "file": "batch_01.json",
+      "index": 66
+    },
+    {
+      "file": "batch_01.json",
+      "index": 76
+    },
+    {
+      "file": "batch_02.json",
+      "index": 2
+    },
+    {
+      "file": "batch_02.json",
+      "index": 10
+    },
+    {
+      "file": "batch_07.json",
+      "index": 2
+    },
+    {
+      "file": "batch_08.json",
+      "index": 13
+    },
+    {
+      "file": "batch_09.json",
+      "index": 6
+    },
+    {
+      "file": "batch_09.json",
+      "index": 22
+    },
+    {
+      "file": "batch_10.json",
+      "index": 9
+    },
+    {
+      "file": "batch_10.json",
+      "index": 19
+    },
+    {
+      "file": "batch_11.json",
+      "index": 22
+    },
+    {
+      "file": "batch_12.json",
+      "index": 7
+    },
+    {
+      "file": "batch_13.json",
+      "index": 15
+    },
+    {
+      "file": "batch_14.json",
+      "index": 26
+    }
+  ]
+}

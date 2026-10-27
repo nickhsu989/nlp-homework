@@ -8,7 +8,7 @@
 
     Hugging Face Dataset
         ↓
-    download_chat_data.py
+    build_chat_data.py
         ↓
     data/chat.jsonl
         ↓
@@ -187,7 +187,7 @@ from pathlib import Path
 # 2. 資料設定
 # =============================================================================
 
-# download_chat_data.py 產生的完整 conversation JSONL。
+# build_chat_data.py 產生的完整 conversation JSONL。
 #
 # 預期檔案：
 #
@@ -250,34 +250,10 @@ VALID_RATIO = 0.1
 #     user
 #     assistant
 #
-# 例如：
-#
-# MAX_CONTEXT_MESSAGES = 6
-#
-# 代表最多保留最近 6 則非 system 訊息。
-#
-# 一段規則交錯的 conversation 可能是：
-#
-#     user       ← 1
-#     assistant  ← 2
-#     user       ← 3
-#     assistant  ← 4
-#     user       ← 5
-#     assistant  ← 6
-#
-# 這大約相當於最近 3 輪 user-assistant 對話。
-#
-# 為什麼要截斷？
-#
-# 因為 context 越長：
-# - token 數越多
-# - GPU 記憶體用量越高
-# - attention 計算量越大
-# - T4 訓練速度越慢
-#
-# 本專案是咖啡點餐，
-# 任務通常不需要保留非常長的歷史。
-MAX_CONTEXT_MESSAGES = 6
+# 本語料最多 4 輪對話，最後一筆 assistant 之前的完整歷史
+# 最多是 7 則非 system 訊息。設成 8 可以完整保留上下文，
+# 不會像舊設定 6 一樣截掉開場或早期對話。
+MAX_CONTEXT_MESSAGES = 8
 
 
 # Random seed。
@@ -721,7 +697,7 @@ def main():
     # Step 1：確認輸入檔存在
     # -------------------------------------------------------------------------
 
-    # 如果 download_chat_data.py 還沒執行，
+    # 如果 build_chat_data.py 還沒執行，
     # data/chat.jsonl 可能不存在。
     #
     # 比起等 open() 出現不明確錯誤，
@@ -729,7 +705,7 @@ def main():
     if not INPUT_FILE.is_file():
         raise FileNotFoundError(
             f"找不到輸入檔：{INPUT_FILE}\n"
-            "請先執行 download_chat_data.py。"
+            "請先執行 build_chat_data.py。"
         )
 
 
@@ -817,11 +793,9 @@ def main():
 
     # 依「對話內容」分群。
     #
-    # download_chat_data.py 會把同一段 conversation 重複寫入多次
-    # （用來讓小模型更容易學到固定風格）。
-    #
-    # 如果直接把所有 conversation 打平後隨機切，
-    # 同一段對話的不同副本可能同時出現在 train 與 validation，
+    # build_chat_data.py 已移除重複 conversation，
+    # 但這裡仍依對話內容分群，避免未來擴增資料時
+    # 同一段對話的不同副本同時出現在 train 與 validation，
     # 造成 data leakage，validation loss 會失真。
     #
     # 所以這裡先依「對話內容」分群，

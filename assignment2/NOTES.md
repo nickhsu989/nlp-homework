@@ -1,83 +1,74 @@
-# Assignment 2 — Resume Notes
+# Assignment 2 — Experiment Notes
 
 ## Current status
 
-- Final adapter currently copied from `checkpoint-105`.
-- Retraining is still required for arbitrary new prompts.
-- Do not treat the current adapter as final-quality.
+- Training completed: 3 epochs, 189 optimizer steps, ~29 minutes.
+- Final adapter: `outputs/qwen25_05b_lora` (identical to `checkpoint-189`).
+- Selected checkpoint: `checkpoint-189`.
+- Intermediate checkpoints were removed after selection.
 
-## Main problem
+## Data
 
-The current data pipeline teaches disconnected replies:
+- Raw: 14 batches, 403 conversations, 1 system prompt.
+- Clean: 388 conversations (2–4 user turns).
+- Held-out: 15 conversations, stratified by turn count, seed 42.
+- Chat/train split: 373 conversations → 1,003 train / 109 validation SFT examples.
+- Cleaning details: `data/clean_manifest.json`.
 
-- 296 of 300 conversations end on a user turn.
-- Only the 4 seed conversations end with an assistant reply.
-- Those 296 final user messages have no assistant target.
-- `data/sft/train.jsonl` has 1,052 examples but only 272 unique assistant replies.
-- `prepare_chat_data.py` truncates context to 6 non-system messages, dropping the opening and early context.
-- `infer_lora_chat.py` samples at `temperature=0.7`, which makes the small model much less coherent.
+## Training results
 
-## Required data fixes
+- Final eval loss: `2.7012`
+- Final eval token accuracy: `48.8%`
+- Average training loss: `2.9993`
+- Eval loss by step:
 
-1. Update `download_chat_data.py` so every conversation ends with an assistant message.
-2. Ensure every user turn has a matching assistant target.
-3. Use a consistent `open -> assistant -> follow-up -> assistant -> ...` structure.
-4. Remove answers that do not answer the preceding user message.
-5. Increase unique assistant replies from 272 toward at least 500.
-6. Keep 300 conversations so the assignment requirement is still met.
-7. Change `MAX_CONTEXT_MESSAGES` in `prepare_chat_data.py` to 8 or 10.
-8. Rebuild `data/chat.jsonl` and `data/sft/{train,valid}.jsonl`.
+| Step | Eval loss |
+|---:|---:|
+| 30 | 3.0868 |
+| 60 | 2.8555 |
+| 90 | 2.7705 |
+| 120 | 2.7242 |
+| 150 | 2.7046 |
+| 180 | 2.7027 |
+| 189 | 2.7012 |
 
-## Evaluation
+## Checkpoint evaluation
 
-Create a fixed set of 12–15 unseen multi-turn scenarios, separate from training topics.
+- Evaluated `30, 60, 90, 120, 150, 180, 189` plus the base model.
+- Method: 15 held-out conversations, canonical system prompt, greedy decoding,
+  `max_new_tokens=100`, no reference-answer leakage.
+- `checkpoint-189` had the lowest eval loss.
+- `checkpoint-120` had a slightly higher reference similarity, but manual review
+  favored the later checkpoint's more complete, on-style multi-turn replies.
+- Evaluation metrics are summarized in `README.md`; raw transcripts were generated
+  during checkpoint selection and were not kept in the repository.
 
-Evaluate with:
+## Inference
 
-- `do_sample=False`
-- `/reset` between scenarios
-- `max_new_tokens=100`
-- `MAX_HISTORY_TURNS=4` or `6`
-- Optional `repetition_penalty=1.1` and `no_repeat_ngram_size=3`
+- `infer_lora_chat.py`: interactive multi-turn chat, greedy decoding.
+- `infer_lora.py`: single-turn demo.
+- `infer_test.py`: deterministic 3-scenario demo; writes `infer_test_out.txt`.
+- All scripts use the canonical 4-line system prompt.
+- `MAX_NEW_TOKENS=100`, `MAX_HISTORY_TURNS=4`.
 
-Acceptance target:
+## Final artifacts
 
-- At least 80% of unseen scenarios produce coherent, on-topic replies.
-- No exact repeated sentence across turns.
-- No unrelated “I am an AI” responses.
-- At least the first 3 turns remain contextually connected.
+Keep:
 
-## Retraining plan
+- `outputs/qwen25_05b_lora/adapter_config.json`
+- `outputs/qwen25_05b_lora/adapter_model.safetensors`
+- tokenizer files (`tokenizer.json`, `tokenizer_config.json`) and `chat_template.jinja`
+- `trainer_state.json`
+- `training_args.bin`
+- `loss_curve.png`
 
-First attempt with `Qwen/Qwen2.5-0.5B-Instruct`:
+Removed:
 
-- `EPOCHS = 3`
-- `LORA_R = 16`
-- `LORA_ALPHA = 32`
-- Keep `LORA_DROPOUT = 0.10`
-- Keep `LEARNING_RATE = 5e-5`
-- Set `load_best_model_at_end=False`
-- Disable early stopping or use a high patience
-- Save every 20–30 steps with `CHECKPOINT_LIMIT=6` or more
-- Select checkpoints manually with the unseen-prompt evaluation set
+- `outputs/qwen25_05b_lora/checkpoint-*` (final adapter is checkpoint-189)
+- `outputs/qwen25_05b_lora/README.md` (auto-generated placeholder)
 
-Do not select the checkpoint by `eval_loss` alone. The previous run showed that the lowest `eval_loss` checkpoint was not the best qualitative model.
+## Known limitations
 
-Fallback only if 0.5B still fails:
-
-- `Qwen/Qwen2.5-1.5B-Instruct`
-- 4-bit NF4
-- Batch size 1
-- Gradient accumulation 16
-- `MAX_LENGTH=384` or `512`
-- Gradient checkpointing
-- `paged_adamw_8bit`
-- 4-bit inference to fit the 4 GB GTX 1050 Ti
-
-## Finalization checklist
-
-- Select the best checkpoint using the unseen evaluation set.
-- Regenerate `infer_test_out.txt` with greedy decoding.
-- Regenerate `loss_curve.png`.
-- Update the root `README.md` with dataset composition, training config, evaluation results, and sample dialogue.
-- Verify that the standalone assignment 2 folder contains only the final adapter, not checkpoints or backups.
+- 0.5B capacity causes occasional incoherent or off-topic replies.
+- Occasional simplified Chinese characters.
+- Not suitable for production or sensitive use.

@@ -32,10 +32,6 @@
         ↓
     儲存 checkpoint
         ↓
-    early stopping
-        ↓
-    載入 validation loss 最低的最佳 checkpoint
-        ↓
     儲存最後的 LoRA adapter 與 tokenizer
 
 這裡的「QLoRA」可以先簡單理解成：
@@ -121,14 +117,10 @@ from peft import (
 #
 # BitsAndBytesConfig：
 #   設定 4-bit / 8-bit quantization。
-#
-# EarlyStoppingCallback：
-#   validation 指標長時間不再改善時，自動停止訓練。
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     BitsAndBytesConfig,
-    EarlyStoppingCallback,
 )
 
 # TRL = Transformer Reinforcement Learning library。
@@ -203,8 +195,7 @@ TRAIN_FILE = "train.jsonl"
 # 它主要用於：
 # - 檢查模型是否過度擬合
 # - 計算 eval_loss
-# - 找出最佳 checkpoint
-# - early stopping
+# - 比較不同 checkpoint
 VALID_FILE = "valid.jsonl"
 
 
@@ -244,8 +235,8 @@ OUTPUT_DIR = "outputs/qwen25_05b_lora"
 # RESUME_FROM_CHECKPOINT = "outputs/qwen25_05b_lora/checkpoint-200"
 #
 # checkpoint 不只包含 LoRA 權重，
-# Trainer 還可以恢復 optimizer state、scheduler state、
-# global step，以及 callback state。
+# Trainer 還可以恢復 optimizer state、scheduler state
+# 與 global step。
 RESUME_FROM_CHECKPOINT = None
 
 
@@ -296,15 +287,9 @@ MAX_LENGTH = 512
 # 一個 epoch 的意思是：
 # 模型大致看完整個 training dataset 一次。
 #
-# 例如：
-# training dataset = 4,668 筆
-# EPOCHS = 5
-#
-# 表示模型最多會重複看這批資料約 5 次。
-#
-# 但因為有 early stopping，
-# 實際上可能在第 3 或第 4 個 epoch 就停止。
-EPOCHS = 5
+# 本機訓練資料約 1,000 筆，3 個 epoch 已足以讓
+# 0.5B 模型學到穩定的回覆風格，同時避免小資料集過度擬合。
+EPOCHS = 3
 
 
 # Learning rate，學習率。
@@ -501,43 +486,19 @@ CHECK_STRATEGY = "steps"
 #   → eval
 #   → checkpoint-100
 #
-# 本機語料共 1,052 筆 training examples，
+# 本機語料約 1,000 筆 training examples，
 # effective batch size = 2 × 8 = 16，
-# 每個 epoch 約 66 個 optimizer steps。
-# 設定為 15 約等於每個 epoch 評估四次，
-# 可以更早抓到 validation loss 的低點。
-CHECK_STEPS = 15
+# 每個 epoch 約 63 個 optimizer steps。
+# 設定為 30，約等於每個 epoch 評估兩次，
+# 也保留足夠的中途 checkpoint 供訓練後比較。
+CHECK_STEPS = 30
 
 
 # 最多保留幾份 checkpoint。
 #
-# 如果設成 3，
-# Trainer 會盡量避免 checkpoint 無限制累積。
-#
-# 最佳 checkpoint 會被優先保留。
-CHECKPOINT_LIMIT = 3
-
-
-# Early stopping 的耐心值。
-#
-# EARLY_STOPPING_PATIENCE = 3
-#
-# 表示：
-# 如果連續 3 次 evaluation，
-# eval_loss 都沒有變得更好，
-# 就停止訓練。
-#
-# 例如：
-#
-# eval 1：1.20
-# eval 2：1.10   ← 改善
-# eval 3：1.12   ← 沒改善
-# eval 4：1.15   ← 沒改善
-# eval 5：1.14   ← 沒改善
-#
-# 此時累積 3 次沒有改善，
-# 就可能觸發 early stopping。
-EARLY_STOPPING_PATIENCE = 3
+# 3 個 epoch 約產生 6 份 checkpoint；
+# 設成 8 可以全部保留，方便訓練後比較不同 step。
+CHECKPOINT_LIMIT = 8
 
 
 # completion_only_loss=True：
@@ -653,8 +614,9 @@ SEED = 42
 # - 表達能力通常越高
 # - 記憶體與計算需求也增加
 #
-# r=8 是教學與小模型常見的起點。
-LORA_R = 8
+# r=16 讓小模型有足夠容量學習多輪對話風格；
+# 搭配 alpha=32 維持 scaling = 2。
+LORA_R = 16
 
 
 # LoRA alpha。
@@ -665,15 +627,15 @@ LORA_R = 8
 #
 # 現在：
 #
-# alpha = 16
-# r = 8
+# alpha = 32
+# r = 16
 #
 # 所以：
 #
-# scaling = 16 / 8 = 2
+# scaling = 32 / 16 = 2
 #
 # 可以把它理解成 LoRA 更新強度的縮放係數之一。
-LORA_ALPHA = 16
+LORA_ALPHA = 32
 
 
 # LoRA dropout。
@@ -987,7 +949,7 @@ def main() -> None:
     9. 建立 SFTConfig
     10. 建立 SFTTrainer
     11. train
-    12. 儲存最佳模型與 tokenizer
+    12. 儲存最後模型與 tokenizer
     """
 
     # -------------------------------------------------------------------------
@@ -1444,21 +1406,10 @@ def main() -> None:
             CHECKPOINT_LIMIT
         ),
 
-        # 訓練結束後，
-        # 自動把 validation 指標最好的 checkpoint
-        # 載回記憶體。
-        load_best_model_at_end=True,
-
-        # 用 eval_loss 判斷最佳模型。
-        metric_for_best_model=(
-            "eval_loss"
-        ),
-
-        # eval_loss 越低越好。
-        #
-        # 如果是 accuracy，
-        # 通常才會設成 True。
-        greater_is_better=False,
+        # 訓練結束後保留最後一個 checkpoint；
+        # 不在訓練流程中自動挑選最佳 checkpoint，
+        # 之後再用 held-out 對話與 eval_loss 比較。
+        load_best_model_at_end=False,
 
         # 只對 assistant completion 計算 loss。
         completion_only_loss=(
@@ -1470,13 +1421,6 @@ def main() -> None:
 
         # 不使用 wandb 等外部 tracker。
         report_to=REPORT_TO,
-
-        # 從 checkpoint resume 時，
-        # 一併恢復 callback state。
-        #
-        # 對 early stopping 特別重要，
-        # 不然 patience counter 可能重新開始計算。
-        restore_callback_states_from_checkpoint=True,
 
         # 固定 random seed。
         seed=SEED,
@@ -1509,18 +1453,6 @@ def main() -> None:
 
         # tokenizer / processor。
         processing_class=tokenizer,
-
-        # EarlyStoppingCallback：
-        #
-        # 如果 eval_loss 連續多次不再改善，
-        # 自動結束 training。
-        callbacks=[
-            EarlyStoppingCallback(
-                early_stopping_patience=(
-                    EARLY_STOPPING_PATIENCE
-                )
-            )
-        ],
 
         # 注意：
         #
@@ -1641,36 +1573,21 @@ def main() -> None:
 
 
     # -------------------------------------------------------------------------
-    # Step 21：顯示最佳 checkpoint
+    # Step 21：顯示訓練結果
     # -------------------------------------------------------------------------
 
-    # 例如：
-    #
-    # outputs/qwen25_05b_lora/checkpoint-250
     print(
-        "最佳 checkpoint："
-        f"{trainer.state.best_model_checkpoint}"
-    )
-
-    # 例如：
-    #
-    # 最佳 eval_loss：0.8421
-    print(
-        "最佳 eval_loss："
-        f"{trainer.state.best_metric}"
+        "訓練完成，global step："
+        f"{trainer.state.global_step}"
     )
 
 
     # -------------------------------------------------------------------------
-    # Step 22：儲存最佳模型
+    # Step 22：儲存最後模型
     # -------------------------------------------------------------------------
 
-    # 因為：
-    #
-    # load_best_model_at_end=True
-    #
-    # 所以此時 trainer.model 已經重新載入
-    # validation 表現最好的 checkpoint。
+    # load_best_model_at_end=False，
+    # 因此 trainer.model 是最後一個 optimizer step 的模型。
     #
     # QLoRA / PEFT 情況下，
     # save_model() 主要會儲存 LoRA adapter，
@@ -1688,8 +1605,6 @@ def main() -> None:
     #
     # - global_step
     # - log_history
-    # - best_metric
-    # - best_model_checkpoint
     #
     # 對後續分析與續訓很有幫助。
     trainer.save_state()
